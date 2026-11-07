@@ -70,7 +70,7 @@ $requiredScope = 'DeviceManagementServiceConfig.ReadWrite.All'
 
 function Connect-GraphIfNeeded {
     [CmdletBinding()]
-    param()
+    param([string] $Tenant)
 
     $context = Get-MgContext
     if ($context) {
@@ -78,7 +78,7 @@ function Connect-GraphIfNeeded {
         return
     }
     $connect = @{ Scopes = $requiredScope; NoWelcome = $true }
-    if ($TenantId) { $connect.TenantId = $TenantId }
+    if ($Tenant) { $connect.TenantId = $Tenant }
     Connect-MgGraph @connect
 }
 
@@ -104,7 +104,7 @@ if ($WhatIfPreference) {
     return
 }
 
-Connect-GraphIfNeeded
+Connect-GraphIfNeeded -Tenant $TenantId
 
 $submitted = [System.Collections.Generic.List[object]]::new()
 foreach ($row in $rows) {

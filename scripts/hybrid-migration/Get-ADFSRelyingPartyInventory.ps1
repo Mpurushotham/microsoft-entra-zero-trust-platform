@@ -65,9 +65,9 @@ $complexRulePatterns = [ordered]@{
 }
 
 function ConvertTo-Slug {
-    param([Parameter(Mandatory)] [string] $Name)
+    param([Parameter(Mandatory)] [string] $Name, [string] $Prefix)
     $slug = $Name
-    if ($NamePrefixToStrip -and $slug.StartsWith($NamePrefixToStrip)) { $slug = $slug.Substring($NamePrefixToStrip.Length) }
+    if ($Prefix -and $slug.StartsWith($Prefix)) { $slug = $slug.Substring($Prefix.Length) }
     $slug = ($slug.ToLowerInvariant() -replace '[^a-z0-9]+', '-').Trim('-')
     if ($slug.Length -gt 40) { $slug = $slug.Substring(0, 40).Trim('-') }
     return $slug
@@ -116,7 +116,7 @@ foreach ($rp in $trusts) {
     $logout = @($samlEndpoints | Where-Object { $_.Protocol -eq 'SAMLLogout' } | ForEach-Object { [string]$_.Location }) | Select-Object -First 1
 
     $inventory.Add([pscustomobject]@{
-            Key                     = ConvertTo-Slug -Name $rp.Name
+            Key                     = ConvertTo-Slug -Name $rp.Name -Prefix $NamePrefixToStrip
             Name                    = $rp.Name
             Kind                    = 'RelyingPartyTrust'
             Enabled                 = $rp.Enabled
@@ -159,7 +159,7 @@ foreach ($appGroup in @(Get-AdfsApplicationGroup)) {
         $verdict = if (@($issues | Where-Object { $_ -match 'CustomAttributeStore|SqlOrLdapQuery' }).Count -gt 0) { 'Blocked' } elseif ($issues.Count -gt 0) { 'NeedsReview' } else { 'Ready' }
 
         $inventory.Add([pscustomobject]@{
-                Key                    = ConvertTo-Slug -Name "$($appGroup.Name)-$($app.Name)"
+                Key                    = ConvertTo-Slug -Name "$($appGroup.Name)-$($app.Name)" -Prefix $NamePrefixToStrip
                 Name                   = "$($appGroup.Name) / $($app.Name)"
                 Kind                   = $kind
                 Enabled                = $appGroup.Enabled

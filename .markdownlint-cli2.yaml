@@ -5,5 +5,13 @@ config:
     siblings_only: true
   MD033: false
   MD041: false
+  # GitBook {% tab %}/{% step %} tags sit flush against headings, lists, fences and tables.
+  MD022: false
+  MD031: false
+  MD032: false
+  MD055: false
+  MD056: false
+  MD058: false
+  MD060: false
 ignores:
   - "**/.terraform/**"

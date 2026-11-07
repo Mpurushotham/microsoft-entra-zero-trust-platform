@@ -93,9 +93,9 @@ $rows = foreach ($d in $devices) {
         default { 'Unknown' }
     }
 
-    $isWindows = $d.operatingSystem -like 'Windows*'
+    $isWindowsDevice = $d.operatingSystem -like 'Windows*'
     $stale = (-not $lastSignIn) -or ($lastSignIn -lt $staleCutoff)
-    $readiness = if (-not $isWindows -or $joinState -in @('EntraJoined', 'EntraRegistered')) {
+    $readiness = if (-not $isWindowsDevice -or $joinState -in @('EntraJoined', 'EntraRegistered')) {
         'NotApplicable'
     }
     elseif ($stale) {
