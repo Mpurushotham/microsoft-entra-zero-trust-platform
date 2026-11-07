@@ -1,0 +1,22 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+.terraformrc
+terraform.rc
+*.auto.tfvars
+secrets*.tfvars
+backend.local.hcl
+.DS_Store
+.vscode/
+.idea/
+*.csv
+!scripts/**/templates/*.csv
+
+# Environment tfvars hold only non-secret placeholders and are required by CI.
+!terraform/stacks/*/env/*.tfvars
