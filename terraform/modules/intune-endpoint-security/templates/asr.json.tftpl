@@ -1,0 +1,27 @@
+{
+  "name": ${jsonencode(name)},
+  "description": "Attack surface reduction rules. Standard protection rules block; the rest start in audit per Microsoft rollout guidance.",
+  "platforms": "windows10",
+  "technologies": "mdm,microsoftSense",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "templateReference": {
+    "templateId": "e8c053d6-9f95-42b1-a7f1-ebfd71c67a4b_1"
+  },
+  "settings": [
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance",
+        "settingDefinitionId": "device_vendor_msft_policy_config_defender_attacksurfacereductionrules",
+        "settingInstanceTemplateReference": {
+          "settingInstanceTemplateId": "19600663-e264-4c02-8f55-f2983216d6d7"
+        },
+        "groupSettingCollectionValue": [
+          {
+            "children": ${jsonencode([for rule, mode in asr_rules : { "@odata.type" = "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance", settingDefinitionId = "device_vendor_msft_policy_config_defender_attacksurfacereductionrules_${rule}", choiceSettingValue = { "@odata.type" = "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue", value = "device_vendor_msft_policy_config_defender_attacksurfacereductionrules_${rule}_${mode}", children = [] } }])}
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "@odata.type": "#microsoft.graph.iosCompliancePolicy",
+  "displayName": ${jsonencode(display_name)},
+  "description": "iOS/iPadOS passcode, jailbreak detection and OS floor.",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "osMinimumVersion": ${jsonencode(os_minimum_version)},
+  "passcodeRequired": true,
+  "passcodeBlockSimple": true,
+  "passcodeMinimumLength": 6,
+  "passcodeRequiredType": "numeric",
+  "passcodeMinutesOfInactivityBeforeLock": 5,
+  "securityBlockJailbrokenDevices": true,
+  "deviceThreatProtectionEnabled": ${threat_enabled},
+  "deviceThreatProtectionRequiredSecurityLevel": ${jsonencode(threat_enabled ? threat_level : "unavailable")},
+  "scheduledActionsForRule": [
+    {
+      "ruleName": "PasswordRequired",
+      "scheduledActionConfigurations": [
+        {
+          "actionType": "block",
+          "gracePeriodHours": ${grace_period_hours},
+          "notificationTemplateId": "",
+          "notificationMessageCCList": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,159 @@
+{
+  "name": ${jsonencode(name)},
+  "description": "Windows Firewall enabled on all profiles, inbound blocked by default.",
+  "platforms": "windows10",
+  "technologies": "mdm,microsoftSense",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "templateReference": {
+    "templateId": "6078910e-d808-4a9f-a51d-1b8a7bacb7c0_1"
+  },
+  "settings": [
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+        "settingDefinitionId": "vendor_msft_firewall_mdmstore_domainprofile_enablefirewall",
+        "settingInstanceTemplateReference": {
+          "settingInstanceTemplateId": "7714c373-a19a-4b64-ba6d-2e9db04a7684"
+        },
+        "choiceSettingValue": {
+          "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+          "value": "vendor_msft_firewall_mdmstore_domainprofile_enablefirewall_true",
+          "children": [
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_domainprofile_defaultinboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_domainprofile_defaultinboundaction_1",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_domainprofile_defaultoutboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_domainprofile_defaultoutboundaction_0",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_domainprofile_disableinboundnotifications",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_domainprofile_disableinboundnotifications_true",
+                "children": []
+              }
+            }
+          ],
+          "settingValueTemplateReference": {
+            "settingValueTemplateId": "120c5dbe-0c88-46f0-b897-2c996d3e5277"
+          }
+        }
+      }
+    },
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+        "settingDefinitionId": "vendor_msft_firewall_mdmstore_privateprofile_enablefirewall",
+        "settingInstanceTemplateReference": {
+          "settingInstanceTemplateId": "1c14f914-69bb-49f8-af5b-e29173a6ee95"
+        },
+        "choiceSettingValue": {
+          "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+          "value": "vendor_msft_firewall_mdmstore_privateprofile_enablefirewall_true",
+          "children": [
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_privateprofile_defaultinboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_privateprofile_defaultinboundaction_1",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_privateprofile_defaultoutboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_privateprofile_defaultoutboundaction_0",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_privateprofile_disableinboundnotifications",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_privateprofile_disableinboundnotifications_true",
+                "children": []
+              }
+            }
+          ],
+          "settingValueTemplateReference": {
+            "settingValueTemplateId": "9d55dfae-d55f-4f2a-af03-9a9524f61e76"
+          }
+        }
+      }
+    },
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+        "settingDefinitionId": "vendor_msft_firewall_mdmstore_publicprofile_enablefirewall",
+        "settingInstanceTemplateReference": {
+          "settingInstanceTemplateId": "e2714734-708e-4286-8ae9-d56821e306a3"
+        },
+        "choiceSettingValue": {
+          "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+          "value": "vendor_msft_firewall_mdmstore_publicprofile_enablefirewall_true",
+          "children": [
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_publicprofile_defaultinboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_publicprofile_defaultinboundaction_1",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_publicprofile_defaultoutboundaction",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_publicprofile_defaultoutboundaction_0",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_publicprofile_disableinboundnotifications",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": "vendor_msft_firewall_mdmstore_publicprofile_disableinboundnotifications_true",
+                "children": []
+              }
+            },
+            {
+              "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+              "settingDefinitionId": "vendor_msft_firewall_mdmstore_publicprofile_allowlocalpolicymerge",
+              "choiceSettingValue": {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue",
+                "value": ${jsonencode("vendor_msft_firewall_mdmstore_publicprofile_allowlocalpolicymerge_${public_allow_local_rule_merge}")},
+                "children": []
+              }
+            }
+          ],
+          "settingValueTemplateReference": {
+            "settingValueTemplateId": "c38694c7-51a4-4a35-8f64-b10866a04776"
+          }
+        }
+      }
+    }
+  ]
+}

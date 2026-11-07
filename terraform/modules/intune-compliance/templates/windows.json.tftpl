@@ -1,0 +1,33 @@
+{
+  "@odata.type": "#microsoft.graph.windows10CompliancePolicy",
+  "displayName": ${jsonencode(display_name)},
+  "description": "Windows device health, encryption and Defender posture. Password rules are left to Windows Hello for Business.",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "osMinimumVersion": ${jsonencode(os_minimum_version)},
+  "bitLockerEnabled": true,
+  "secureBootEnabled": true,
+  "codeIntegrityEnabled": true,
+  "tpmRequired": true,
+  "storageRequireEncryption": true,
+  "activeFirewallRequired": true,
+  "defenderEnabled": true,
+  "rtpEnabled": true,
+  "antivirusRequired": true,
+  "antiSpywareRequired": true,
+  "signatureOutOfDate": true,
+  "deviceThreatProtectionEnabled": ${threat_enabled},
+  "deviceThreatProtectionRequiredSecurityLevel": ${jsonencode(threat_enabled ? threat_level : "unavailable")},
+  "scheduledActionsForRule": [
+    {
+      "ruleName": "PasswordRequired",
+      "scheduledActionConfigurations": [
+        {
+          "actionType": "block",
+          "gracePeriodHours": ${grace_period_hours},
+          "notificationTemplateId": "",
+          "notificationMessageCCList": []
+        }
+      ]
+    }
+  ]
+}

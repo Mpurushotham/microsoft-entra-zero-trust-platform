@@ -1,0 +1,30 @@
+{
+  "@odata.type": "#microsoft.graph.androidWorkProfileCompliancePolicy",
+  "displayName": ${jsonencode(display_name)},
+  "description": "Android Enterprise personally owned work profile posture.",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "osMinimumVersion": ${jsonencode(os_minimum_version)},
+  "requiredPasswordComplexity": "medium",
+  "storageRequireEncryption": true,
+  "securityBlockJailbrokenDevices": true,
+  "securityRequireSafetyNetAttestationBasicIntegrity": true,
+  "securityRequireSafetyNetAttestationCertifiedDevice": true,
+  "securityRequireGooglePlayServices": true,
+  "securityRequireUpToDateSecurityProviders": true,
+  "securityRequireCompanyPortalAppIntegrity": true,
+  "deviceThreatProtectionEnabled": ${threat_enabled},
+  "deviceThreatProtectionRequiredSecurityLevel": ${jsonencode(threat_enabled ? threat_level : "unavailable")},
+  "scheduledActionsForRule": [
+    {
+      "ruleName": "PasswordRequired",
+      "scheduledActionConfigurations": [
+        {
+          "actionType": "block",
+          "gracePeriodHours": ${grace_period_hours},
+          "notificationTemplateId": "",
+          "notificationMessageCCList": []
+        }
+      ]
+    }
+  ]
+}

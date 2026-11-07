@@ -1,0 +1,16 @@
+{
+  "@odata.type": "#microsoft.graph.deviceEnrollmentPlatformRestrictionConfiguration",
+  "displayName": ${jsonencode(display_name)},
+  "description": ${jsonencode("Enrollment restriction for ${platform_type}.")},
+  "priority": ${priority},
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "platformType": ${jsonencode(platform_type)},
+  "platformRestriction": {
+    "platformBlocked": ${platform_blocked},
+    "personalDeviceEnrollmentBlocked": ${personal_blocked},
+    "osMinimumVersion": ${jsonencode(os_minimum_version)},
+    "osMaximumVersion": ${jsonencode(os_maximum_version)},
+    "blockedManufacturers": [],
+    "blockedSkus": []
+  }
+}

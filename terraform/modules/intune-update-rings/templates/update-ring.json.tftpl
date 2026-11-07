@@ -1,0 +1,31 @@
+{
+  "@odata.type": "#microsoft.graph.windowsUpdateForBusinessConfiguration",
+  "displayName": ${jsonencode(display_name)},
+  "description": "Windows Update for Business ring managed as code.",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "microsoftUpdateServiceAllowed": true,
+  "driversExcluded": false,
+  "allowWindows11Upgrade": true,
+  "businessReadyUpdatesOnly": "all",
+  "deliveryOptimizationMode": "userDefined",
+  "prereleaseFeatures": "notAllowed",
+  "automaticUpdateMode": "autoInstallAtMaintenanceTime",
+  "installationSchedule": {
+    "@odata.type": "#microsoft.graph.windowsUpdateActiveHoursInstall",
+    "activeHoursStart": ${jsonencode(active_hours_start)},
+    "activeHoursEnd": ${jsonencode(active_hours_end)}
+  },
+  "qualityUpdatesDeferralPeriodInDays": ${quality_deferral_days},
+  "featureUpdatesDeferralPeriodInDays": ${feature_deferral_days},
+  "qualityUpdatesPaused": false,
+  "featureUpdatesPaused": false,
+  "featureUpdatesRollbackWindowInDays": 10,
+  "deadlineForQualityUpdatesInDays": ${quality_deadline_days},
+  "deadlineForFeatureUpdatesInDays": ${feature_deadline_days},
+  "deadlineGracePeriodInDays": ${grace_period_days},
+  "postponeRebootUntilAfterDeadline": false,
+  "skipChecksBeforeRestart": false,
+  "userPauseAccess": "disabled",
+  "userWindowsUpdateScanAccess": "enabled",
+  "updateNotificationLevel": "defaultNotifications"
+}

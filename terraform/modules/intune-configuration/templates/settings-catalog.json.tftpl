@@ -1,0 +1,21 @@
+{
+  "name": ${jsonencode(name)},
+  "description": ${jsonencode(description)},
+  "platforms": "windows10",
+  "technologies": "mdm",
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "settings": ${jsonencode([
+    for id, option in settings : {
+      "@odata.type" = "#microsoft.graph.deviceManagementConfigurationSetting"
+      settingInstance = {
+        "@odata.type"       = "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance"
+        settingDefinitionId = id
+        choiceSettingValue = {
+          "@odata.type" = "#microsoft.graph.deviceManagementConfigurationChoiceSettingValue"
+          value         = "${id}_${option}"
+          children      = []
+        }
+      }
+    }
+  ])}
+}
