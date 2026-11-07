@@ -1,0 +1,25 @@
+// Legacy protocols cannot satisfy MFA, so a success shows a Conditional Access gap or exclusion.
+let LegacyClients = dynamic([
+    "Exchange ActiveSync",
+    "IMAP4",
+    "POP3",
+    "Authenticated SMTP",
+    "MAPI Over HTTP",
+    "Exchange Web Services",
+    "AutoDiscover",
+    "Exchange Online PowerShell",
+    "Offline Address Book",
+    "Outlook Anywhere (RPC over HTTP)",
+    "Reporting Web Services",
+    "Universal Outlook",
+    "Other clients"]);
+SigninLogs
+| where ResultType == "0"
+| where ClientAppUsed in (LegacyClients)
+| summarize
+    SignIns = count(),
+    FirstSeen = min(TimeGenerated),
+    TimeGenerated = max(TimeGenerated),
+    Apps = make_set(AppDisplayName, 10)
+    by AccountUpn = UserPrincipalName, IPAddress, ClientAppUsed, ConditionalAccessStatus
+| extend AlertSeverity = iff(ConditionalAccessStatus == "notApplied", "High", "Medium")

@@ -1,0 +1,36 @@
+// 500121 = strong authentication failed; the detail string separates denials, timeouts and fraud reports.
+let Threshold = ${threshold};
+let Lookback = 1h;
+let Denials = SigninLogs
+    | where TimeGenerated > ago(Lookback)
+    | where ResultType == "500121"
+    | extend Detail = tostring(Status.additionalDetails)
+    | where Detail has_any ("MFA denied", "declined", "did not respond", "fraud")
+    | summarize
+        DeniedPrompts = count(),
+        FraudReports = countif(Detail has "fraud"),
+        FirstDenial = min(TimeGenerated),
+        LastDenial = max(TimeGenerated),
+        IPAddresses = make_set(IPAddress, 20),
+        Apps = make_set(AppDisplayName, 10)
+        by UserPrincipalName, UserId
+    | where DeniedPrompts >= Threshold or FraudReports > 0;
+let Successes = SigninLogs
+    | where TimeGenerated > ago(Lookback)
+    | where ResultType == "0"
+    | summarize LastSuccess = max(TimeGenerated) by UserId;
+Denials
+| join kind=leftouter Successes on UserId
+| extend SucceededAfterPrompts = isnotempty(LastSuccess) and LastSuccess > FirstDenial
+| extend AlertSeverity = iff(SucceededAfterPrompts or FraudReports > 0, "High", "Medium")
+| project
+    TimeGenerated = LastDenial,
+    AccountUpn = UserPrincipalName,
+    IPAddress = tostring(IPAddresses[0]),
+    IPAddresses,
+    Apps,
+    DeniedPrompts,
+    FraudReports,
+    FirstDenial,
+    SucceededAfterPrompts,
+    AlertSeverity

@@ -1,0 +1,28 @@
+// Pipeline identities are expected to change policies; everyone else is out-of-band drift or tampering.
+let TrustedAutomation = dynamic(${trusted_actors});
+AuditLogs
+| where OperationName in (
+    "Add conditional access policy",
+    "Update conditional access policy",
+    "Delete conditional access policy")
+| extend
+    ActorUpn = tostring(InitiatedBy.user.userPrincipalName),
+    ActorApp = tostring(InitiatedBy.app.displayName),
+    IPAddress = tostring(InitiatedBy.user.ipAddress)
+| extend Actor = iff(isnotempty(ActorUpn), ActorUpn, ActorApp)
+| where OperationName == "Delete conditional access policy" or Actor !in~ (TrustedAutomation)
+| extend
+    PolicyName = tostring(TargetResources[0].displayName),
+    PolicyId = tostring(TargetResources[0].id),
+    ModifiedProperties = TargetResources[0].modifiedProperties
+| extend AlertSeverity = iff(OperationName == "Delete conditional access policy", "High", "Medium")
+| project
+    TimeGenerated,
+    OperationName,
+    AccountUpn = Actor,
+    IPAddress,
+    PolicyName,
+    PolicyId,
+    ModifiedProperties,
+    CorrelationId,
+    AlertSeverity

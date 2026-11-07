@@ -1,0 +1,19 @@
+// Emergency access accounts sit outside Conditional Access; any attempt, failed or not, is investigated.
+let BreakGlass = _GetWatchlist('${watchlist_alias}')
+    | project Upn = tolower(tostring(SearchKey));
+union isfuzzy=true SigninLogs, AADNonInteractiveUserSignInLogs
+| where tolower(UserPrincipalName) in (BreakGlass)
+| extend Outcome = iff(ResultType == "0", "Success", strcat("Failure ", ResultType, ": ", ResultDescription))
+| extend AlertSeverity = iff(ResultType == "0", "High", "Medium")
+| project
+    TimeGenerated,
+    AccountUpn = UserPrincipalName,
+    IPAddress,
+    Location,
+    AppDisplayName,
+    ClientAppUsed,
+    Outcome,
+    ConditionalAccessStatus,
+    SignInType = Type,
+    CorrelationId,
+    AlertSeverity

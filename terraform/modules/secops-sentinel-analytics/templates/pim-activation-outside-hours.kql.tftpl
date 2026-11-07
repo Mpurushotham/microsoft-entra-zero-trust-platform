@@ -1,0 +1,29 @@
+// Off-hours activation is not malicious by itself but is the pattern of a stolen eligible account.
+let StartHour = ${start_hour};
+let EndHour = ${end_hour};
+let UtcOffset = ${utc_offset_hours}h;
+let Workdays = dynamic(${workdays});
+AuditLogs
+| where LoggedByService == "PIM"
+| where OperationName in (
+    "Add member to role completed (PIM activation)",
+    "Add member to group completed (PIM activation)")
+| extend LocalTime = TimeGenerated + UtcOffset
+| extend LocalHour = hourofday(LocalTime), LocalDay = toint(dayofweek(LocalTime) / 1d)
+| where LocalHour < StartHour or LocalHour >= EndHour or not(LocalDay in (Workdays))
+| extend
+    AccountUpn = tostring(InitiatedBy.user.userPrincipalName),
+    IPAddress = tostring(InitiatedBy.user.ipAddress),
+    RoleOrGroup = tostring(TargetResources[0].displayName),
+    Justification = ResultReason
+| extend AlertSeverity = iff(RoleOrGroup has_any ("Global Administrator", "Privileged Role Administrator", "Privileged Authentication Administrator"), "High", "Medium")
+| project
+    TimeGenerated,
+    LocalTime,
+    OperationName,
+    AccountUpn,
+    IPAddress,
+    RoleOrGroup,
+    Justification,
+    CorrelationId,
+    AlertSeverity

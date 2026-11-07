@@ -1,0 +1,25 @@
+// A rogue federation trust lets an attacker sign tokens for any user in the domain (Golden SAML).
+AuditLogs
+| where OperationName in (
+    "Set domain authentication",
+    "Set federation settings on domain",
+    "Verify domain",
+    "Add verified domain")
+| extend
+    ActorUpn = tostring(InitiatedBy.user.userPrincipalName),
+    ActorApp = tostring(InitiatedBy.app.displayName),
+    IPAddress = tostring(InitiatedBy.user.ipAddress),
+    DomainName = tostring(TargetResources[0].displayName),
+    ModifiedProperties = TargetResources[0].modifiedProperties
+| extend AccountUpn = iff(isnotempty(ActorUpn), ActorUpn, ActorApp)
+| extend AlertSeverity = "High"
+| project
+    TimeGenerated,
+    OperationName,
+    AccountUpn,
+    IPAddress,
+    DomainName,
+    ModifiedProperties,
+    Result,
+    CorrelationId,
+    AlertSeverity
