@@ -1,0 +1,19 @@
+{
+  "@odata.type": "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration",
+  "displayName": ${jsonencode(display_name)},
+  "description": "Blocks the desktop until device-targeted baseline apps and policies are applied during Autopilot.",
+  "priority": ${priority},
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "showInstallationProgress": true,
+  "trackInstallProgressForAutopilotOnly": true,
+  "disableUserStatusTrackingAfterFirstUser": true,
+  "blockDeviceSetupRetryByUser": false,
+  "allowDeviceResetOnInstallFailure": ${allow_reset},
+  "allowLogCollectionOnInstallFailure": true,
+  "allowDeviceUseOnInstallFailure": ${allow_use},
+  "allowNonBlockingAppInstallation": false,
+  "installProgressTimeoutInMinutes": ${timeout_minutes},
+  "installQualityUpdates": ${install_quality},
+  "customErrorMessage": ${jsonencode(custom_error_message)},
+  "selectedMobileAppIds": ${jsonencode(blocking_app_ids)}
+}

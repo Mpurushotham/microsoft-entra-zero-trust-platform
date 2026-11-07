@@ -1,0 +1,3 @@
+Device Serial Number,Windows Product ID,Hardware Hash,Group Tag,Assigned User
+CONTOSO-SN-0001,,<base64-hardware-hash>,CORP-WIN,
+CONTOSO-SN-0002,,<base64-hardware-hash>,KIOSK,

@@ -1,0 +1,19 @@
+{
+  "@odata.type": "#microsoft.graph.azureADWindowsAutopilotDeploymentProfile",
+  "displayName": ${jsonencode(display_name)},
+  "description": ${jsonencode(mode == "self_deploying" ? "Self-deploying, Microsoft Entra join, no user affinity. Requires TPM 2.0 attestation." : (allow_preprovisioning ? "User-driven, Microsoft Entra join, pre-provisioning (technician flow) allowed." : "User-driven, Microsoft Entra join."))},
+  "locale": ${jsonencode(locale)},
+  "deviceType": "windowsPc",
+  "deviceNameTemplate": ${jsonencode(device_name_template == null ? "" : device_name_template)},
+  "hardwareHashExtractionEnabled": true,
+  "preprovisioningAllowed": ${allow_preprovisioning},
+  "roleScopeTagIds": ${jsonencode(role_scope_tag_ids)},
+  "outOfBoxExperienceSetting": {
+    "privacySettingsHidden": true,
+    "eulaHidden": true,
+    "userType": ${jsonencode(user_type)},
+    "deviceUsageType": ${jsonencode(mode == "self_deploying" ? "shared" : "singleUser")},
+    "keyboardSelectionPageSkipped": ${locale != "os-default"},
+    "escapeLinkHidden": true
+  }
+}
