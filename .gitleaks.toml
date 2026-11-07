@@ -1,0 +1,10 @@
+title = "microsoft-entra-zero-trust-platform"
+
+[extend]
+useDefault = true
+
+# Microsoft role template and task definition IDs are public GUIDs, not credentials.
+[[allowlists]]
+description = "Well-known Microsoft GUIDs"
+regexTarget = "secret"
+regexes = ['''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''']
