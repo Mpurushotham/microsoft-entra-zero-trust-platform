@@ -1,0 +1,157 @@
+name: End-to-end deploy
+
+# Security operations runs right after bootstrap so every later identity change is audited.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, prod]
+        default: dev
+      action:
+        description: plan only previews; downstream plans may show unknowns until upstream stacks are applied
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions: {}
+
+concurrency:
+  group: end-to-end-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  s00-bootstrap:
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 00-bootstrap
+      environment: ${{ inputs.environment }}
+      action: plan
+      var_file: env/global.tfvars
+      state_key: 00-bootstrap/global.tfstate
+      allow_apply: false
+    secrets: inherit
+
+  s70-security-operations:
+    needs: [s00-bootstrap]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 70-security-operations
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s10-entra-foundation:
+    needs: [s70-security-operations]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 10-entra-foundation
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s20-entra-conditional-access:
+    needs: [s10-entra-foundation]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 20-entra-conditional-access
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s30-entra-governance:
+    needs: [s10-entra-foundation]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 30-entra-governance
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s40-hybrid-migration:
+    needs: [s10-entra-foundation]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 40-hybrid-migration
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s50-intune-foundation:
+    needs: [s10-entra-foundation]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 50-intune-foundation
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  s60-intune-autopilot-zero-touch:
+    needs: [s50-intune-foundation]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 60-intune-autopilot-zero-touch
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
+
+  summary:
+    if: always()
+    needs:
+      - s00-bootstrap
+      - s70-security-operations
+      - s10-entra-foundation
+      - s20-entra-conditional-access
+      - s30-entra-governance
+      - s40-hybrid-migration
+      - s50-intune-foundation
+      - s60-intune-autopilot-zero-touch
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Deployment summary
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          TARGET_ENV: ${{ inputs.environment }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          {
+            echo "### End-to-end \`$ACTION\` on \`$TARGET_ENV\`"
+            echo
+            echo "| Stack | Result | Changes |"
+            echo "|---|---|---|"
+            echo "$RESULTS" | jq -r 'to_entries[] | "| \(.key | sub("^s"; "")) | \(.value.result) | \(.value.outputs.has_changes // "-") |"'
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success")' > /dev/null

@@ -1,0 +1,150 @@
+name: Drift detection
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: drift-detection
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    name: drift (${{ matrix.stack }} / ${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      issues: write
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        stack:
+          - 10-entra-foundation
+          - 20-entra-conditional-access
+          - 30-entra-governance
+          - 40-hybrid-migration
+          - 50-intune-foundation
+          - 60-intune-autopilot-zero-touch
+          - 70-security-operations
+        environment: [dev, prod]
+        include:
+          - stack: 00-bootstrap
+            environment: global
+            var_file: env/global.tfvars
+            state_key: 00-bootstrap/global.tfstate
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_STORAGE_USE_AZUREAD: "true"
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_CLIENT_ID: ${{ matrix.environment == 'dev' && secrets.AZURE_PLAN_CLIENT_ID_DEV || secrets.AZURE_PLAN_CLIENT_ID_PROD }}
+      TFSTATE_RG: ${{ vars.TFSTATE_RG }}
+      TFSTATE_SA: ${{ vars.TFSTATE_SA }}
+      STACK: ${{ matrix.stack }}
+      TARGET_ENV: ${{ matrix.environment }}
+      VAR_FILE: ${{ matrix.var_file || format('env/{0}.tfvars', matrix.environment) }}
+      STATE_KEY: ${{ matrix.state_key || format('{0}/{1}.tfstate', matrix.stack, matrix.environment) }}
+    defaults:
+      run:
+        working-directory: terraform/stacks/${{ matrix.stack }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip stacks not yet present
+        id: present
+        working-directory: .
+        run: |
+          if [ -f "terraform/stacks/$STACK/$VAR_FILE" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; else echo "run=false" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.present.outputs.run == 'true'
+        with:
+          terraform_version: "1.15.x"
+          terraform_wrapper: false
+
+      - name: terraform init
+        if: steps.present.outputs.run == 'true'
+        run: |
+          terraform init -no-color \
+            -backend-config="resource_group_name=$TFSTATE_RG" \
+            -backend-config="storage_account_name=$TFSTATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: terraform plan
+        id: plan
+        if: steps.present.outputs.run == 'true'
+        run: |
+          set +e
+          terraform plan -no-color -lock=false -refresh=true -detailed-exitcode -var-file="$VAR_FILE" > plan.txt 2>&1
+          code=$?
+          set -e
+          case "$code" in
+            0) echo "drift=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "drift=true" >> "$GITHUB_OUTPUT" ;;
+            *) cat plan.txt; echo "::error::plan failed ($code)"; exit "$code" ;;
+          esac
+          {
+            echo "### Drift: \`$STACK\` / \`$TARGET_ENV\`"
+            echo
+            grep -E '^(Plan:|No changes\.)' plan.txt || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open, update or close drift issue
+        if: steps.present.outputs.run == 'true'
+        uses: actions/github-script@v7
+        env:
+          DRIFT: ${{ steps.plan.outputs.drift }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { STACK, TARGET_ENV, DRIFT } = process.env;
+            const { owner, repo } = context.repo;
+            const title = `Drift detected: ${STACK} (${TARGET_ENV})`;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: 'drift' });
+            const existing = open.find(i => i.title === title);
+            if (DRIFT !== 'true') {
+              if (existing) {
+                await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body: `No drift in ${runUrl}; closing.` });
+                await github.rest.issues.update({ owner, repo, issue_number: existing.number, state: 'closed', state_reason: 'completed' });
+              }
+              return;
+            }
+            let plan = fs.readFileSync(`terraform/stacks/${STACK}/plan.txt`, 'utf8');
+            if (plan.length > 50000) plan = plan.slice(0, 50000) + '\n... truncated ...';
+            const body = [
+              `Nightly plan for \`${STACK}\` / \`${TARGET_ENV}\` found differences between code and the tenant.`,
+              '',
+              `Run: ${runUrl}`,
+              '',
+              'Triage with the checklist in `.github/ISSUE_TEMPLATE/drift.md`: decide whether to codify the change or revert it by re-applying.',
+              '',
+              '<details><summary>Plan</summary>',
+              '',
+              '```hcl',
+              plan,
+              '```',
+              '</details>',
+            ].join('\n');
+            if (existing) {
+              await github.rest.issues.createComment({ owner, repo, issue_number: existing.number, body });
+            } else {
+              try {
+                await github.rest.issues.createLabel({ owner, repo, name: 'drift', color: 'd93f0b', description: 'Tenant differs from Terraform' });
+              } catch (e) {
+                if (e.status !== 422) throw e;
+              }
+              await github.rest.issues.create({ owner, repo, title, body, labels: ['drift'] });
+            }

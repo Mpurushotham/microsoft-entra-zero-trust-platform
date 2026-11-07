@@ -1,0 +1,352 @@
+name: terraform (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      stack:
+        description: Directory name under terraform/stacks.
+        type: string
+        required: true
+      environment:
+        description: dev or prod. Selects the plan identity, tfvars and the GitHub environment for apply.
+        type: string
+        required: true
+      action:
+        description: plan, apply or destroy-plan.
+        type: string
+        default: plan
+      var_file:
+        description: Overrides env/<environment>.tfvars, relative to the stack.
+        type: string
+        default: ""
+      state_key:
+        description: Overrides <stack>/<environment>.tfstate.
+        type: string
+        default: ""
+      allow_apply:
+        description: false keeps the stack plan-only (used for 00-bootstrap).
+        type: boolean
+        default: true
+      terraform_version:
+        type: string
+        default: "1.15.x"
+    outputs:
+      has_changes:
+        description: true when the plan contains changes.
+        value: ${{ jobs.plan.outputs.has_changes }}
+
+permissions: {}
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  TF_CLI_ARGS_init: "-no-color"
+  STACK: ${{ inputs.stack }}
+  TARGET_ENV: ${{ inputs.environment }}
+  STACK_DIR: terraform/stacks/${{ inputs.stack }}
+
+jobs:
+  validate:
+    name: validate (${{ inputs.stack }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ env.STACK_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check inputs
+        env:
+          ACTION: ${{ inputs.action }}
+        run: |
+          case "$TARGET_ENV" in dev|prod) ;; *) echo "::error::environment must be dev or prod"; exit 1 ;; esac
+          case "$ACTION" in plan|apply|destroy-plan) ;; *) echo "::error::action must be plan, apply or destroy-plan"; exit 1 ;; esac
+          test -d . || { echo "::error::stack $STACK not found"; exit 1; }
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: terraform validate
+        run: |
+          terraform init -backend=false
+          terraform validate -no-color
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: |
+          tflint --init --config "$GITHUB_WORKSPACE/.tflint.hcl"
+          tflint --config "$GITHUB_WORKSPACE/.tflint.hcl" --format compact
+
+      - name: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ${{ env.STACK_DIR }}
+          framework: terraform
+          quiet: true
+          soft_fail: false
+          download_external_modules: false
+
+  plan:
+    name: plan (${{ inputs.stack }} / ${{ inputs.environment }})
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_STORAGE_USE_AZUREAD: "true"
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Read-only identity trusted for pull_request and refs/heads/main subjects.
+      ARM_CLIENT_ID: ${{ inputs.environment == 'prod' && secrets.AZURE_PLAN_CLIENT_ID_PROD || secrets.AZURE_PLAN_CLIENT_ID_DEV }}
+      TFSTATE_RG: ${{ vars.TFSTATE_RG }}
+      TFSTATE_SA: ${{ vars.TFSTATE_SA }}
+      VAR_FILE_INPUT: ${{ inputs.var_file }}
+      STATE_KEY_INPUT: ${{ inputs.state_key }}
+      ACTION: ${{ inputs.action }}
+      TF_PLAN_PASSPHRASE: ${{ secrets.TF_PLAN_PASSPHRASE }}
+    defaults:
+      run:
+        working-directory: ${{ env.STACK_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve configuration
+        run: |
+          for v in ARM_TENANT_ID ARM_SUBSCRIPTION_ID ARM_CLIENT_ID TFSTATE_RG TFSTATE_SA TF_PLAN_PASSPHRASE; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty. See docs/deployment/github-setup.md."; exit 1; }
+          done
+          var_file="${VAR_FILE_INPUT:-env/${TARGET_ENV}.tfvars}"
+          state_key="${STATE_KEY_INPUT:-${STACK}/${TARGET_ENV}.tfstate}"
+          test -f "$var_file" || { echo "::error::$STACK_DIR/$var_file not found"; exit 1; }
+          {
+            echo "VAR_FILE=$var_file"
+            echo "STATE_KEY=$state_key"
+          } >> "$GITHUB_ENV"
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=$TFSTATE_RG" \
+            -backend-config="storage_account_name=$TFSTATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: terraform plan
+        id: plan
+        run: |
+          destroy_flag=""
+          [ "$ACTION" = "destroy-plan" ] && destroy_flag="-destroy"
+          # Read-only state access cannot take the blob lease; apply rejects a stale saved plan.
+          set +e
+          terraform plan -no-color -lock=false -detailed-exitcode $destroy_flag \
+            -var-file="$VAR_FILE" -out=tfplan 2>&1 | tee plan.log
+          code=${PIPESTATUS[0]}
+          set -e
+          case "$code" in
+            0) echo "has_changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "has_changes=true" >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::terraform plan failed ($code)"; exit "$code" ;;
+          esac
+          terraform show -no-color tfplan > plan.txt
+
+      - name: Job summary
+        if: always() && steps.plan.outcome != 'skipped'
+        env:
+          HAS_CHANGES: ${{ steps.plan.outputs.has_changes }}
+        run: |
+          {
+            echo "### Terraform plan: \`$STACK\` / \`$TARGET_ENV\`"
+            echo
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Action | \`$ACTION\` |"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| State key | \`$STATE_KEY\` |"
+            echo "| Changes | \`${HAS_CHANGES:-unknown}\` |"
+            echo
+            if [ -f plan.txt ]; then
+              echo "<details><summary>Plan output</summary>"
+              echo
+              echo '```hcl'
+              head -c 60000 plan.txt
+              echo '```'
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on pull request
+        if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
+        uses: actions/github-script@v7
+        env:
+          HAS_CHANGES: ${{ steps.plan.outputs.has_changes }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { STACK, TARGET_ENV, STACK_DIR, HAS_CHANGES } = process.env;
+            const marker = `<!-- tfplan:${STACK}:${TARGET_ENV} -->`;
+            let plan = fs.readFileSync(`${STACK_DIR}/plan.txt`, 'utf8');
+            if (plan.length > 60000) plan = plan.slice(0, 60000) + '\n... truncated, see the job summary ...';
+            const summary = (plan.match(/^(Plan:.*|No changes\..*)$/m) || ['(no summary line)'])[0];
+            const body = [
+              marker,
+              `#### Terraform plan \`${STACK}\` / \`${TARGET_ENV}\` ${HAS_CHANGES === 'true' ? '(changes)' : '(no changes)'}`,
+              `**${summary}** for \`${context.sha.substring(0, 7)}\``,
+              '<details><summary>Show plan</summary>',
+              '',
+              '```hcl',
+              plan,
+              '```',
+              '</details>',
+            ].join('\n');
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const existing = comments.find(c => c.body && c.body.startsWith(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Package plan
+        if: steps.plan.outputs.has_changes == 'true'
+        run: |
+          jq -n --arg sha "$GITHUB_SHA" --arg stack "$STACK" --arg env "$TARGET_ENV" \
+            --arg key "$STATE_KEY" --arg action "$ACTION" --arg run "$GITHUB_RUN_ID" \
+            '{sha:$sha, stack:$stack, environment:$env, state_key:$key, action:$action, run_id:$run}' > plan-metadata.json
+          # Saved plans hold sensitive values in clear text and artifacts are repo-readable.
+          tar -czf - tfplan .terraform.lock.hcl plan-metadata.json \
+            | openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt -pass env:TF_PLAN_PASSPHRASE \
+            > "$RUNNER_TEMP/tfplan.tgz.enc"
+
+      - name: Upload plan
+        if: steps.plan.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.stack }}-${{ inputs.environment }}
+          path: ${{ runner.temp }}/tfplan.tgz.enc
+          retention-days: 5
+          if-no-files-found: error
+
+  apply:
+    name: apply (${{ inputs.stack }} / ${{ inputs.environment }})
+    needs: plan
+    if: >-
+      needs.plan.outputs.has_changes == 'true' &&
+      inputs.action == 'apply' &&
+      inputs.allow_apply &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: ${{ inputs.environment }}
+    concurrency:
+      group: terraform-apply-${{ inputs.stack }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_USE_AZUREAD: "true"
+      ARM_STORAGE_USE_AZUREAD: "true"
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      # Environment secret: the apply identity only trusts environment:<name> subjects.
+      ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      TFSTATE_RG: ${{ vars.TFSTATE_RG }}
+      TFSTATE_SA: ${{ vars.TFSTATE_SA }}
+      TF_PLAN_PASSPHRASE: ${{ secrets.TF_PLAN_PASSPHRASE }}
+    defaults:
+      run:
+        working-directory: ${{ env.STACK_DIR }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ inputs.stack }}-${{ inputs.environment }}
+          path: ${{ runner.temp }}/plan
+
+      - name: Unpack and verify plan
+        run: |
+          [ -n "$ARM_CLIENT_ID" ] || { echo "::error::AZURE_CLIENT_ID is not set in the $TARGET_ENV environment"; exit 1; }
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 600000 -pass env:TF_PLAN_PASSPHRASE \
+            -in "$RUNNER_TEMP/plan/tfplan.tgz.enc" | tar -xzf -
+          meta_sha=$(jq -r .sha plan-metadata.json)
+          meta_stack=$(jq -r .stack plan-metadata.json)
+          meta_env=$(jq -r .environment plan-metadata.json)
+          if [ "$meta_sha" != "$GITHUB_SHA" ] || [ "$meta_stack" != "$STACK" ] || [ "$meta_env" != "$TARGET_ENV" ]; then
+            echo "::error::Plan was produced for $meta_stack/$meta_env@$meta_sha, not $STACK/$TARGET_ENV@$GITHUB_SHA"
+            exit 1
+          fi
+          echo "STATE_KEY=$(jq -r .state_key plan-metadata.json)" >> "$GITHUB_ENV"
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.ARM_CLIENT_ID }}
+          tenant-id: ${{ env.ARM_TENANT_ID }}
+          subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform_version }}
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init \
+            -backend-config="resource_group_name=$TFSTATE_RG" \
+            -backend-config="storage_account_name=$TFSTATE_SA" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=$STATE_KEY" \
+            -backend-config="use_oidc=true" \
+            -backend-config="use_azuread_auth=true"
+
+      - name: terraform apply
+        run: terraform apply -no-color -input=false tfplan
+
+      - name: Job summary
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          {
+            echo "### Terraform apply: \`$STACK\` / \`$TARGET_ENV\`"
+            echo
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Result | \`$JOB_STATUS\` |"
+            echo "| Commit | \`$GITHUB_SHA\` |"
+            echo "| State key | \`$STATE_KEY\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

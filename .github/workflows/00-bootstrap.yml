@@ -1,0 +1,49 @@
+name: "00 · Bootstrap (state + OIDC identities)"
+
+on:
+  pull_request:
+    paths:
+      - terraform/stacks/00-bootstrap/**
+      - terraform/modules/bootstrap-*/**
+      - .github/workflows/00-bootstrap.yml
+      - .github/workflows/_terraform-reusable.yml
+  push:
+    branches: [main]
+    paths:
+      - terraform/stacks/00-bootstrap/**
+      - terraform/modules/bootstrap-*/**
+      - .github/workflows/00-bootstrap.yml
+      - .github/workflows/_terraform-reusable.yml
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Plan identity to use (bootstrap is applied locally by an operator)
+        type: choice
+        options: [dev, prod]
+        default: prod
+      action:
+        type: choice
+        options: [plan]
+        default: plan
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  plan:
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 00-bootstrap
+      environment: ${{ inputs.environment || 'prod' }}
+      action: plan
+      var_file: env/global.tfvars
+      state_key: 00-bootstrap/global.tfstate
+      allow_apply: false
+    secrets: inherit

@@ -1,0 +1,90 @@
+name: "60 · Intune Autopilot zero-touch"
+
+on:
+  pull_request:
+    paths:
+      - terraform/stacks/60-intune-autopilot-zero-touch/**
+      - terraform/modules/intune-*/**
+      - .github/workflows/60-intune-autopilot.yml
+      - .github/workflows/_terraform-reusable.yml
+  push:
+    branches: [main]
+    paths:
+      - terraform/stacks/60-intune-autopilot-zero-touch/**
+      - terraform/modules/intune-*/**
+      - .github/workflows/60-intune-autopilot.yml
+      - .github/workflows/_terraform-reusable.yml
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [dev, prod]
+        default: dev
+      action:
+        type: choice
+        options: [plan, apply, destroy-plan]
+        default: plan
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pr-plan:
+    if: github.event_name == 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, prod]
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 60-intune-autopilot-zero-touch
+      environment: ${{ matrix.environment }}
+      action: plan
+    secrets: inherit
+
+  dev:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 60-intune-autopilot-zero-touch
+      environment: dev
+      action: apply
+    secrets: inherit
+
+  prod:
+    if: github.event_name == 'push'
+    needs: dev
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 60-intune-autopilot-zero-touch
+      environment: prod
+      action: apply
+    secrets: inherit
+
+  dispatch:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/_terraform-reusable.yml
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    with:
+      stack: 60-intune-autopilot-zero-touch
+      environment: ${{ inputs.environment }}
+      action: ${{ inputs.action }}
+    secrets: inherit
