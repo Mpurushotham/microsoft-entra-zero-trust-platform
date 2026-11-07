@@ -56,7 +56,7 @@ jobs:
       run:
         working-directory: ${{ env.STACK_DIR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Check inputs
         env:
@@ -66,7 +66,7 @@ jobs:
           case "$ACTION" in plan|apply|destroy-plan) ;; *) echo "::error::action must be plan, apply or destroy-plan"; exit 1 ;; esac
           test -d . || { echo "::error::stack $STACK not found"; exit 1; }
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ inputs.terraform_version }}
           terraform_wrapper: false
@@ -79,7 +79,7 @@ jobs:
           terraform init -backend=false
           terraform validate -no-color
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@v6
 
       - name: tflint
         run: |
@@ -124,7 +124,7 @@ jobs:
       run:
         working-directory: ${{ env.STACK_DIR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Resolve configuration
         run: |
@@ -139,13 +139,13 @@ jobs:
             echo "STATE_KEY=$state_key"
           } >> "$GITHUB_ENV"
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ env.ARM_CLIENT_ID }}
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ inputs.terraform_version }}
           terraform_wrapper: false
@@ -205,7 +205,7 @@ jobs:
 
       - name: Comment on pull request
         if: github.event_name == 'pull_request' && steps.plan.outcome == 'success'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           HAS_CHANGES: ${{ steps.plan.outputs.has_changes }}
         with:
@@ -250,7 +250,7 @@ jobs:
 
       - name: Upload plan
         if: steps.plan.outputs.has_changes == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tfplan-${{ inputs.stack }}-${{ inputs.environment }}
           path: ${{ runner.temp }}/tfplan.tgz.enc
@@ -291,9 +291,9 @@ jobs:
       run:
         working-directory: ${{ env.STACK_DIR }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: tfplan-${{ inputs.stack }}-${{ inputs.environment }}
           path: ${{ runner.temp }}/plan
@@ -312,13 +312,13 @@ jobs:
           fi
           echo "STATE_KEY=$(jq -r .state_key plan-metadata.json)" >> "$GITHUB_ENV"
 
-      - uses: azure/login@v2
+      - uses: azure/login@v3
         with:
           client-id: ${{ env.ARM_CLIENT_ID }}
           tenant-id: ${{ env.ARM_TENANT_ID }}
           subscription-id: ${{ env.ARM_SUBSCRIPTION_ID }}
 
-      - uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: ${{ inputs.terraform_version }}
           terraform_wrapper: false
